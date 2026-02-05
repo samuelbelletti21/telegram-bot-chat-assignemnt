@@ -99,3 +99,11 @@ cd frontend
 npm install
 npm run dev
 ```
+
+### Docker Setup (Optional but Recommended)
+
+For a streamlined setup, you can run the entire system using Docker Compose. This ensures all dependencies and environment configurations are handled automatically.
+
+1. **Build and start the containers:**
+   ```bash
+   docker-compose up --build
