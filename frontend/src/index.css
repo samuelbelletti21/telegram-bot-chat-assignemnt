@@ -124,3 +124,15 @@ body {
 .chat-input button:hover {
   background: #3a78d8;
 }
+
+.chat-input button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat-placeholder {
+  text-align: center;
+  color: #888;
+  padding: 20px;
+  font-style: italic;
+}

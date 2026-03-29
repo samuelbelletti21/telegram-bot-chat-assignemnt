@@ -80,7 +80,12 @@ function App() {
         </header>
 
         <div className="chat-messages">
-          {messages.map((msg) => (
+            {messages.length === 0 ? (
+            <div className="chat-placeholder">
+              Waiting for Telegram participant to connect
+            </div>
+          ) :
+          messages.map((msg) => (
             <div
               key={msg.id}
               className={`chat-message ${msg.direction}`}
@@ -102,7 +107,7 @@ function App() {
             placeholder="Type a message..."
             onKeyDown={(e) => e.key === "Enter" && sendMessage()}
           />
-          <button onClick={sendMessage}>Send</button>
+          <button onClick={sendMessage} disabled={messages.length === 0}>Send</button>
         </div>
       </div>
     </div>

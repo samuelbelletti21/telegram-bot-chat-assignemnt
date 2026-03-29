@@ -23,6 +23,22 @@ class TelegramManager:
         self.active_chat_id: Optional[int] = None
         self.application: Optional[Application] = None
 
+    def ensure_one_active_chat(self, chat_id: int) -> bool:
+        if self.active_chat_id is None:
+            self.active_chat_id = chat_id
+            return True
+
+        return self.active_chat_id == chat_id
+
+    async def send_rejection_message(self, chat_id: int) -> None:
+        if self.application is None:
+            return
+
+        await self.application.bot.send_message(
+            chat_id=chat_id,
+            text="This bot is already connected to another active chat.",
+        )
+
     async def send_to_chat(self, text: str) -> None:
         if self.application is None:
             raise RuntimeError("Telegram application is not initialized")
@@ -35,7 +51,13 @@ class TelegramManager:
             text=text,
         )
 
-    async def handle_incoming_message(self, text: str) -> None:
+    async def handle_incoming_message(self, chat_id: int, text: str) -> None:
+        is_allowed_chat = self.ensure_one_active_chat(chat_id)
+
+        if not is_allowed_chat:
+            await self.send_rejection_message(chat_id)
+            return
+
         message_data = MessageCreate(
             text=text,
             direction="incoming",
@@ -63,6 +85,7 @@ class TelegramManager:
             return
 
         await self.handle_incoming_message(
+            chat_id=update.effective_chat.id,
             text=text,
         )
 
