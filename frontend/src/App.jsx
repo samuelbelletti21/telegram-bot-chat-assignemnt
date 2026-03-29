@@ -1,24 +1,50 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./index.css";
+
+const API_BASE_URL = "http://127.0.0.1:8000";
 
 function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
 
-  const sendMessage = () => {
+  useEffect(() => {
+    loadMessages();
+  }, []);
+
+  const loadMessages = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/messages`);
+      const data = await response.json();
+      setMessages(data);
+    } catch (error) {
+      console.error("Failed to load messages:", error);
+    }
+  };
+
+  const sendMessage = async () => {
     if (!input.trim()) return;
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        text: input,
-        timestamp: new Date().toISOString(),
-        direction: "outgoing",
-      },
-    ]);
+    const payload = {
+      text: input,
+      direction: "outgoing",
+    };
 
-    setInput("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const newMessage = await response.json();
+
+      setMessages((prev) => [...prev, newMessage]);
+      setInput("");
+    } catch (error) {
+      console.error("Failed to send message:", error);
+    }
   };
 
   return (
@@ -32,7 +58,7 @@ function App() {
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`chat-message outgoing`}
+              className={`chat-message ${msg.direction}`}
             >
               <div className="chat-bubble">
                 <div className="chat-text">{msg.text}</div>
