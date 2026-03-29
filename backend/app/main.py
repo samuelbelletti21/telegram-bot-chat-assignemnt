@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -5,8 +7,31 @@ from app.connections import ConnectionManager
 from app.store import MessageStore
 from app.services import ChatService
 from app.handlers import handle_client_message
+from app.telegram_manager import TelegramManager
+from app.config import TELEGRAM_BOT_TOKEN
 
-app = FastAPI(title="Telegram Chat Backend")
+
+connection_manager = ConnectionManager()
+message_store = MessageStore()
+chat_service = ChatService(message_store)
+telegram_manager = TelegramManager(
+    token=TELEGRAM_BOT_TOKEN,
+    chat_service=chat_service,
+    connection_manager=connection_manager,
+)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await telegram_manager.start()
+    try:
+        yield
+    finally:
+        await telegram_manager.stop()
+
+app = FastAPI(
+    title="Telegram Chat Backend",
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,10 +40,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-connection_manager = ConnectionManager()
-message_store = MessageStore()
-chat_service = ChatService(message_store)
 
 @app.get("/health")
 async def health():
@@ -34,7 +55,9 @@ async def websocket_endpoint(websocket: WebSocket):
             await handle_client_message(websocket=websocket,
                                         data=data,
                                         chat_service=chat_service,
-                                        connection_manager=connection_manager)
+                                        connection_manager=connection_manager,
+                                        telegram_manager=telegram_manager,
+                                        )
     except WebSocketDisconnect:
         connection_manager.disconnect(websocket)
         print("Client disconnected")
