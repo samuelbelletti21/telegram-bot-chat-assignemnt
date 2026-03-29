@@ -1,7 +1,7 @@
 from fastapi import WebSocket
 from pydantic import ValidationError
 
-from app.const import EventType
+from app.const import Direction, EventType
 from app.models.message import MessageCreate
 from app.services import ChatService
 from app.connections import ConnectionManager
@@ -30,7 +30,7 @@ async def handle_send_message(websocket: WebSocket,
                               telegram_manager: TelegramManager,
                               ):
     try:
-        message_data = MessageCreate(**payload)
+        message_data = MessageCreate(text=payload.get("text", ""), direction=Direction.OUTGOING)
     except ValidationError as e:
         await send_error(websocket, str(e))
         return

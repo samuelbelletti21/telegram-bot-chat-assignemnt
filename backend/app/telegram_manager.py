@@ -4,7 +4,7 @@ from telegram import Update
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, MessageHandler, filters
 
 from app.connections import ConnectionManager
-from app.const import EventType
+from app.const import Direction, EventType
 from app.models.message import MessageCreate
 from app.services import ChatService
 
@@ -60,7 +60,7 @@ class TelegramManager:
 
         message_data = MessageCreate(
             text=text,
-            direction="incoming",
+            direction=Direction.INCOMING,
         )
         new_message = self.chat_service.create_message(message_data)
 
@@ -97,9 +97,8 @@ class TelegramManager:
         )
 
         await self.application.initialize()
-        await self.application.updater.start_polling()
         await self.application.start()
-        print("Telegram bot started")
+        await self.application.updater.start_polling()
 
     async def stop(self) -> None:
         if self.application is None:
@@ -108,4 +107,3 @@ class TelegramManager:
         await self.application.updater.stop()
         await self.application.stop()
         await self.application.shutdown()
-        print("Telegram bot stopped")

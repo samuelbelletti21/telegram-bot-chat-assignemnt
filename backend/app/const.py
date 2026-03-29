@@ -7,3 +7,7 @@ class EventType(str, Enum):
     MESSAGES_LIST = "messages_list"
     MESSAGE_CREATED = "message_created"
     ERROR = "error"
+
+class Direction(str, Enum):
+    INCOMING = "incoming"
+    OUTGOING = "outgoing"

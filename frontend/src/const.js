@@ -6,3 +6,8 @@ export const EventType = {
   MESSAGE_CREATED: "message_created",
   ERROR: "error",
 };
+
+export const Direction = {
+  INCOMING: "incoming",
+  OUTGOING: "outgoing",
+};

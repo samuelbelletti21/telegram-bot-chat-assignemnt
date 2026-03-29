@@ -51,13 +51,24 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            data = await websocket.receive_json()
-            await handle_client_message(websocket=websocket,
-                                        data=data,
-                                        chat_service=chat_service,
-                                        connection_manager=connection_manager,
-                                        telegram_manager=telegram_manager,
-                                        )
+            try:
+                data = await websocket.receive_json()
+            except WebSocketDisconnect:
+                raise
+            except Exception:
+                await websocket.send_json({
+                    "type": "error",
+                    "payload": {"message": "Invalid JSON payload"},
+                })
+                continue
+
+            await handle_client_message(
+                websocket=websocket,
+                data=data,
+                chat_service=chat_service,
+                connection_manager=connection_manager,
+                telegram_manager=telegram_manager,
+            )
     except WebSocketDisconnect:
         connection_manager.disconnect(websocket)
         print("Client disconnected")

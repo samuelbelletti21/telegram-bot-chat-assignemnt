@@ -1,14 +1,15 @@
 from datetime import datetime
-from typing import Literal
 from pydantic import BaseModel
+
+from app.const import Direction
 
 
 class MessageCreate(BaseModel):
     text: str
-    direction: Literal["incoming", "outgoing"]
+    direction: Direction
 
 class Message(BaseModel):
     id: str
     text: str
-    direction: Literal["incoming", "outgoing"]
+    direction: Direction
     timestamp: datetime

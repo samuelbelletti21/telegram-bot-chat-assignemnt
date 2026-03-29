@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import "./index.css";
-import { EventType } from "./const";
+import { EventType, Direction } from "./const";
+
+const WS_URL = "ws://127.0.0.1:8000/ws";
 
 function App() {
   const [messages, setMessages] = useState([]);
@@ -8,69 +10,65 @@ function App() {
   const wsRef = useRef(null);
 
   useEffect(() => {
-    const socket = new WebSocket("ws://127.0.0.1:8000/ws");
-    wsRef.current = socket;
+    function connect() {
+      const socket = new WebSocket(WS_URL);
+      wsRef.current = socket;
 
-    socket.onopen = () => {
-      console.log("Connected to WebSocket");
+      socket.onopen = () => {
+        socket.send(JSON.stringify({ type: EventType.GET_MESSAGES }));
+      };
 
-      socket.send(
-        JSON.stringify({
-          type: EventType.GET_MESSAGES,
-        })
-      );
-    };
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
 
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+        if (data.type === EventType.MESSAGES_LIST) {
+          setMessages(data.payload);
+        } else if (data.type === EventType.MESSAGE_CREATED) {
+          setMessages((prev) => [...prev, data.payload]);
+        } else if (data.type === EventType.ERROR) {
+          console.error("Server error:", data.payload.message);
+        }
+      };
 
-      if (data.type === EventType.MESSAGES_LIST) {
-        setMessages(data.payload);
-      }
+      socket.onclose = () => {
+        console.log("Disconnected from WebSocket, reconnecting in 2s...");
+        setTimeout(connect, 2000);
+      };
 
-      if (data.type === EventType.MESSAGE_CREATED) {
-        setMessages((prev) => [...prev, data.payload]);
-      }
+      socket.onerror = (error) => {
+        console.error("WebSocket error:", error);
+      };
+    }
 
-      if (data.type === EventType.ERROR) {
-        console.error("Server error:", data.payload.message);
-      }
-    };
-
-    socket.onclose = () => {
-      console.log("Disconnected from WebSocket");
-    };
-
-    socket.onerror = (error) => {
-      console.error("WebSocket error:", error);
-    };
+    connect();
 
     return () => {
-      socket.close();
+      const socket = wsRef.current;
+      if (socket) {
+        socket.onclose = null; // prevent reconnect on intentional unmount
+        socket.close();
+      }
     };
   }, []);
 
   const sendMessage = () => {
     const socket = wsRef.current;
-
     if (!input.trim()) return;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
-      console.error("WebSocket is not connected");
+      console.error("Not connected to the server.");
       return;
     }
-    // Let the server handle state (single source of truth)
     socket.send(
       JSON.stringify({
         type: EventType.SEND_MESSAGE,
-        payload: {
-          text: input,
-          direction: "outgoing",
-        },
+        payload: { text: input, direction: Direction.OUTGOING },
       })
     );
-
     setInput("");
   };
+
+  const hasActiveChat = messages.length > 0;
+  const canSend = hasActiveChat && !!input.trim();
 
   return (
     <div className="chat-page">
@@ -80,34 +78,39 @@ function App() {
         </header>
 
         <div className="chat-messages">
-            {messages.length === 0 ? (
+          {!hasActiveChat ? (
             <div className="chat-placeholder">
-              Waiting for Telegram participant to connect
+              Waiting for the Telegram participant to send the first message...
             </div>
-          ) :
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`chat-message ${msg.direction}`}
-            >
-              <div className="chat-bubble">
-                <div className="chat-text">{msg.text}</div>
-                <div className="chat-timestamp">
-                  {new Date(msg.timestamp).toLocaleTimeString()}
+          ) : (
+            messages.map((msg) => (
+              <div key={msg.id} className={`chat-message ${msg.direction}`}>
+                <div className="chat-bubble">
+                  <div className="chat-text">{msg.text}</div>
+                  <div className="chat-timestamp">
+                    {new Date(msg.timestamp).toLocaleTimeString()}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
         <div className="chat-input">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Type a message..."
+            placeholder={
+              hasActiveChat
+                ? "Type a message..."
+                : "Waiting for Telegram participant…"
+            }
             onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+            disabled={!hasActiveChat}
           />
-          <button onClick={sendMessage} disabled={messages.length === 0}>Send</button>
+          <button onClick={sendMessage} disabled={!canSend}>
+            Send
+          </button>
         </div>
       </div>
     </div>
