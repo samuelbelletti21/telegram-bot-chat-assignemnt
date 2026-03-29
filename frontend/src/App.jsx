@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import "./index.css";
+import { EventType } from "./const";
 
 function App() {
   const [messages, setMessages] = useState([]);
@@ -15,7 +16,7 @@ function App() {
 
       socket.send(
         JSON.stringify({
-          type: "get_messages",
+          type: EventType.GET_MESSAGES,
         })
       );
     };
@@ -23,15 +24,15 @@ function App() {
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
 
-      if (data.type === "messages_list") {
+      if (data.type === EventType.MESSAGES_LIST) {
         setMessages(data.payload);
       }
 
-      if (data.type === "message_created") {
+      if (data.type === EventType.MESSAGE_CREATED) {
         setMessages((prev) => [...prev, data.payload]);
       }
 
-      if (data.type === "error") {
+      if (data.type === EventType.ERROR) {
         console.error("Server error:", data.payload.message);
       }
     };
@@ -60,7 +61,7 @@ function App() {
     // Let the server handle state (single source of truth)
     socket.send(
       JSON.stringify({
-        type: "send_message",
+        type: EventType.SEND_MESSAGE,
         payload: {
           text: input,
           direction: "outgoing",

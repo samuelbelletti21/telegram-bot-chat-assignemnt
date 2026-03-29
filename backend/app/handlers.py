@@ -1,19 +1,20 @@
 from fastapi import WebSocket
 from pydantic import ValidationError
 
+from app.const import EventType
 from app.models.message import MessageCreate
 from app.services import ChatService
 from app.connections import ConnectionManager
 
 async def send_error(websocket: WebSocket, message: str):
     await websocket.send_json({
-        "type": "error",
+        "type": EventType.ERROR,
         "payload": {"message": message},
     })
 
 async def handle_get_messages(websocket: WebSocket, chat_service: ChatService):
     await websocket.send_json({
-        "type": "messages_list",
+        "type": EventType.MESSAGES_LIST,
         "payload": [
             message.model_dump(mode="json")
             for message in chat_service.get_messages()
@@ -32,7 +33,7 @@ async def handle_send_message(websocket: WebSocket,
         return
 
     await connection_manager.broadcast_json({
-        "type": "message_created",
+        "type": EventType.MESSAGE_CREATED,
         "payload": new_message.model_dump(mode="json"),
     })
 
@@ -44,10 +45,10 @@ async def handle_client_message(websocket: WebSocket,
     message_type = data.get("type")
     payload = data.get("payload", {})
 
-    if message_type == "get_messages":
+    if message_type == EventType.GET_MESSAGES:
         await handle_get_messages(websocket, chat_service)
 
-    elif message_type == "send_message":
+    elif message_type == EventType.SEND_MESSAGE:
         await handle_send_message(websocket, payload, chat_service, connection_manager)
 
     else:
