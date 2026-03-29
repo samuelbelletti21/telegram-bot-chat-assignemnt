@@ -1,11 +1,10 @@
-import uuid
-from datetime import datetime, timezone
-from pydantic import ValidationError
-
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import ValidationError
 
-from app.models.message import Message, MessageCreate
+from app.connections import ConnectionManager
+from app.store import MessageStore
+from app.services import ChatService
 
 app = FastAPI(title="Telegram Chat Backend")
 
@@ -17,36 +16,50 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# TODO: move ConnectionManager to a separate file
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
+connection_manager = ConnectionManager()
+message_store = MessageStore()
+chat_service = ChatService(message_store)
 
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-        print(f"Connected clients: {len(self.active_connections)}")
+async def send_error(websocket: WebSocket, message: str):
+    await websocket.send_json({
+        "type": "error",
+        "payload": {"message": message},
+    })
 
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-            print(f"Connected clients: {len(self.active_connections)}")
+async def handle_get_messages(websocket: WebSocket):
+    await websocket.send_json({
+        "type": "messages_list",
+        "payload": [
+            message.model_dump(mode="json")
+            for message in chat_service.get_messages()
+        ],
+    })
 
-    async def broadcast_json(self, message: dict):
-        disconnected_connections = []
+async def handle_send_message(websocket: WebSocket, payload: dict):
+    try:
+        message_data = MessageCreate(**payload)
+        new_message = chat_service.create_message(message_data)
+    except ValidationError as e:
+        await send_error(websocket, str(e))
+        return
 
-        for connection in self.active_connections:
-            try:
-                await connection.send_json(message)
-            except Exception:
-                disconnected_connections.append(connection)
+    await connection_manager.broadcast_json({
+        "type": "message_created",
+        "payload": new_message.model_dump(mode="json"),
+    })
 
-        for connection in disconnected_connections:
-            self.disconnect(connection)
+async def handle_client_message(websocket: WebSocket, data: dict):
+    message_type = data.get("type")
+    payload = data.get("payload", {})
 
+    if message_type == "get_messages":
+        await handle_get_messages(websocket)
 
-messages: list[Message] = []
-manager = ConnectionManager()
+    elif message_type == "send_message":
+        await handle_send_message(websocket, payload)
+
+    else:
+        await send_error(websocket, f"Unknown event type: {message_type}")
 
 @app.get("/health")
 async def health():
@@ -54,52 +67,13 @@ async def health():
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
+    await connection_manager.connect(websocket)
 
     try:
         while True:
             data = await websocket.receive_json()
-            print("Received:", data)
-            message_type = data.get("type")
-            payload = data.get("payload", {})
-
-            if message_type == "get_messages":
-                await websocket.send_json({
-                    "type": "messages_list",
-                    "payload": [message.model_dump(mode="json") for message in messages],
-                })
-
-            elif message_type == "send_message":
-                try:
-                    message_data = MessageCreate(**payload)
-                except ValidationError as e:
-                    await websocket.send_json({
-                        "type": "error",
-                        "payload": {"message": str(e)},
-                    })
-                    continue
-
-                new_message = Message.model_validate({
-                    **message_data.model_dump(),
-                    "id": str(uuid.uuid4()),
-                    "timestamp": datetime.now(timezone.utc),
-                })
-
-                messages.append(new_message)
-
-                await websocket.send_json({
-                    "type": "message_created",
-                    "payload": new_message.model_dump(mode="json"),
-                })
-            else:
-                await websocket.send_json({
-                    "type": "error",
-                    "payload": {
-                        "message": f"Unknown event type: {message_type}"
-                    },
-                })
-
+            await handle_client_message(websocket, data)
 
     except WebSocketDisconnect:
+        connection_manager.disconnect(websocket)
         print("Client disconnected")
-        manager.disconnect(websocket)
