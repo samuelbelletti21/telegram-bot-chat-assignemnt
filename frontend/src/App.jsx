@@ -1,50 +1,74 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./index.css";
-
-const API_BASE_URL = "http://127.0.0.1:8000";
 
 function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
+  const wsRef = useRef(null);
 
   useEffect(() => {
-    loadMessages();
-  }, []);
+    const socket = new WebSocket("ws://127.0.0.1:8000/ws");
+    wsRef.current = socket;
 
-  const loadMessages = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/messages`);
-      const data = await response.json();
-      setMessages(data);
-    } catch (error) {
-      console.error("Failed to load messages:", error);
-    }
-  };
+    socket.onopen = () => {
+      console.log("Connected to WebSocket");
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
-
-    const payload = {
-      text: input,
-      direction: "outgoing",
+      socket.send(
+        JSON.stringify({
+          type: "get_messages",
+        })
+      );
     };
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/messages`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
 
-      const newMessage = await response.json();
+      if (data.type === "messages_list") {
+        setMessages(data.payload);
+      }
 
-      setMessages((prev) => [...prev, newMessage]);
-      setInput("");
-    } catch (error) {
-      console.error("Failed to send message:", error);
+      if (data.type === "message_created") {
+        setMessages((prev) => [...prev, data.payload]);
+      }
+
+      if (data.type === "error") {
+        console.error("Server error:", data.payload.message);
+      }
+    };
+
+    socket.onclose = () => {
+      console.log("Disconnected from WebSocket");
+    };
+
+    socket.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+
+    return () => {
+      socket.close();
+    };
+  }, []);
+
+  const sendMessage = () => {
+    const socket = wsRef.current;
+
+    if (!input.trim()) return;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      console.error("WebSocket is not connected");
+      return;
     }
+    // Let the server handle state (single source of truth)
+    socket.send(
+      JSON.stringify({
+        type: "send_message",
+        payload: {
+          text: input,
+          direction: "outgoing",
+        },
+      })
+    );
+
+    setInput("");
   };
 
   return (
