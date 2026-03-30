@@ -61,3 +61,52 @@ cd frontend
 npm install
 npm run dev
 ```
+
+### Docker Setup 
+
+For a streamlined setup, you can run the entire system using Docker Compose. This ensures all dependencies and environment configurations are handled automatically.
+
+1. **Set your Telegram bot token and start the containers:**
+   ```bash
+   echo "TELEGRAM_BOT_TOKEN=<your_token>" > backend/.env
+   docker-compose up --build
+   ```
+
+2. **Open the app in your browser:**
+   - Chat UI → [http://localhost](http://localhost)
+
+---
+
+## Running the Tests
+
+Tests live in `backend/tests/` and use **pytest** with **pytest-asyncio** (`asyncio_mode = auto`).  
+No real Telegram connection is made — the bot lifecycle is fully mocked.
+
+### Setup (one-time)
+
+```bash
+cd backend
+python -m venv venv          # skip if venv already exists
+source venv/bin/activate
+pip install -r requirements.txt
+pip install -r requirements-test.txt
+```
+
+### Run the full suite
+
+```bash
+cd backend
+python -m pytest
+```
+
+### Run with verbose output
+
+```bash
+python -m pytest -v
+```
+
+### Run a single test file
+
+```bash
+python -m pytest tests/test_telegram_manager.py -v
+```

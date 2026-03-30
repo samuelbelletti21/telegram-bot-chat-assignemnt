@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import "./index.css";
 import { EventType, Direction } from "./const";
 
-const WS_URL = "ws://127.0.0.1:8000/ws";
+// Dev: connect directly to the backend. Production (Docker): go through the nginx proxy.
+const WS_URL = import.meta.env.DEV
+  ? "ws://localhost:8000/ws"
+  : `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws`;
 
 function App() {
   const [messages, setMessages] = useState([]);
