@@ -4,6 +4,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.connections import ConnectionManager
+from app.const import EventType
 from app.store import MessageStore
 from app.services import ChatService
 from app.handlers import handle_client_message
@@ -57,7 +58,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 raise
             except Exception:
                 await websocket.send_json({
-                    "type": "error",
+                    "type": EventType.ERROR,
                     "payload": {"message": "Invalid JSON payload"},
                 })
                 continue
